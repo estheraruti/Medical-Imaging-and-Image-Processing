@@ -1,0 +1,102 @@
+'''
+Esther Aruti
+BME I5000: Medical Imaging and Signal Processing
+November 12, 2024
+Assignment #8: Maximum Likelihood Estimation
+'''
+
+import scipy
+import skimage as ski
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+from skimage.transform import resize
+
+# load the actual measured data
+g = Image.open('sinogram.tiff')
+g = np.array(g)
+print(g.shape)
+
+# back project measured data to get the source distribution
+source_dist = ski.transform.iradon(g)
+
+# create the initial uniform estimation matrix
+f = np.ones(g.shape)
+
+# number of iterations
+k = 50
+
+# angles for projections
+theta = np.linspace(0., 180., g.shape[1], endpoint=False)
+
+# constant to avoid division by zero
+const = 1e-10  
+
+# lists to store for each iteration
+cumulative_sinograms = []
+reconstructions = []
+
+# set tolerance
+tolerance = 0.01
+
+for i in range(k):
+    
+    # print iteration
+    print("Iteration: ", i)
+    
+    # forward project to get estimation
+    g_hat = ski.transform.radon(f, theta=theta)
+
+    # resize g_hat to match the shape of g, chatgpt suggested
+    g_hat_resized = resize(g_hat, g.shape, mode='reflect', anti_aliasing=True)
+
+    # calc ratio (actual observation / radon of guess)
+    r = g / (g_hat_resized + const)
+    r_sum = r.sum()
+    #print(r.shape)
+    #print(r.sum())
+
+    #  conditional statement, chatgpt help
+    if np.all((r_sum > 1 - tolerance) & (r_sum < 1 + tolerance)):
+        print(f"Stopping early at iteration {i} as r is close to 1 within tolerance.")
+        break
+
+    # backproject the ratio to get the correction factor c
+    c = ski.transform.iradon(r, theta=theta)
+
+    # resize c to match f for multiplication
+    c_resized = resize(c, f.shape, mode='reflect', anti_aliasing=True)
+
+    # update estimate
+    f = c_resized * f
+
+    # save current iteration
+    cumulative_sinograms.append(r)
+    reconstructions.append(f)
+
+
+# plot
+fig, axs = plt.subplots(2, 2, figsize=(10, 15))
+
+
+axs[0, 0].imshow(source_dist, cmap='gray')
+axs[0, 0].set_title("Source Distribution")
+axs[0, 0].axis('off')
+
+
+axs[0, 1].imshow(g, cmap='gray')
+axs[0, 1].set_title("Measured Data")
+axs[0, 1].axis('off')
+
+
+axs[1, 0].imshow(cumulative_sinograms[-k], aspect='auto', cmap='gray')
+axs[1, 0].set_title(f'Multiplicative correction in detector space')
+axs[1, 0].axis('off')
+
+
+axs[1, 1].imshow(reconstructions[-k], cmap='gray')
+axs[1, 1].set_title(f'EM Reconstruction')
+axs[1, 1].axis('off')
+
+
+plt.show()

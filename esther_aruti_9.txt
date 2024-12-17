@@ -1,0 +1,108 @@
+'''
+Esther Aruti
+BME I5000: Medical Imaging and Signal Processing
+November 26, 2024
+Assignment #9: Ultrasound
+'''
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# prompt user to enter a value for alpha
+desired_alpha = float(input("Enter a value for alpha (in degrees): "))
+desired_alpha = np.radians(desired_alpha)
+
+def make_beam(aperture, wavelength, number_source_points,alpha):
+
+    # Make grid
+    size = 200
+    x = np.linspace(-10, 10, size)
+    y = np.linspace(-10, 10, size)
+    X, Y = np.meshgrid(x, y)
+
+    ### Modular variables
+    # Large aperture, range of points
+    aperture = aperture
+    # Small number of points
+    N = number_source_points
+    # Small wavelength
+    wavelength = wavelength
+
+    # spatial frequency
+    k = 1 / wavelength
+    ###
+
+    # Define point locations based on the number of source points and aperture
+    d = aperture / N # distance between the points
+
+    # source points
+    x_fixed = -10
+    center = 0
+
+    source_positions = []
+    for i in range(N):
+        y_position = center - (N // 2 - i) * d  # Symmetrically distribute around the center, help from chatgpt
+        source_positions.append((y_position, x_fixed))
+
+    print("Source positions: ", source_positions)
+
+    # compute the phase delays
+    phase_delays = []
+    for y_source, x_source in source_positions:
+        lat_dist = y_source - center
+        delay = -k * lat_dist * np.sin(alpha) # needed help from chatgpt
+        phase_delays.append(delay)
+
+    print("Phase delays: ", phase_delays)
+
+    # make empty grid
+    wave_field = np.zeros((size,size))
+
+    # compute the wave pattern
+    for (y_source, x_source), phase in zip(source_positions, phase_delays): # loop help from chatgpt
+        r = np.sqrt((X - x_source) **2 + (Y - y_source)**2)  # radial waves from each source
+        wave_field = wave_field + np.sin(2 * np.pi * k * r + phase)  # add up the waves from all sources
+
+    return wave_field, source_positions
+
+
+
+### Make different beams
+
+beam1, sp1 = make_beam(1,1,1,0) # enter alpha 0
+beam2, sp2 = make_beam(15,1,2,0) # enter alpha 0
+beam3, sp3 = make_beam(15,1,5,0) # enter alpha 0
+beam4, sp4 = make_beam(2,0.5,5,0) # enter alpha 0
+beam5, sp5 = make_beam(2,0.5,5,desired_alpha) # enter desired alpha
+
+
+
+### Plotting
+beams = [(beam1, sp1, "Beam 1: aperture=1, wavelength=1, N=1, alpha=0"),
+         (beam2, sp2, "Beam 2: aperture=15, wavelength=1, N=2, alpha=0"),
+         (beam3, sp3, "Beam 3: aperture=15, wavelength=1, N=5, alpha=0"),
+         (beam4, sp4, "Beam 4: aperture=2, wavelength=0.5, N=5, alpha=0"),
+         (beam5, sp5, f"Beam 5: aperture=2, wavelength=0.5, N=5, alpha={np.degrees(desired_alpha)}")]
+
+fig, axes = plt.subplots(1, 5, figsize=(25, 15)) 
+axes = axes.flatten()
+
+for i, (beam, source_positions, title) in enumerate(beams):
+    ax = axes[i]
+    ax.imshow(beam, extent=(-10, 10, -10, 10), origin="lower")
+    ax.set_title(title, fontsize = 10)
+    ax.set_xlabel("X-axis")
+    ax.set_ylabel("Y-axis")
+    
+    for y_source, x_source in source_positions:
+        ax.scatter(x_source, y_source, color='red', marker='o')  # Source positions
+
+plt.tight_layout()
+plt.show()
+
+'''
+The relationship can be described by saying: 
+The combination of a large aperture, small wavelength, and small number of source points create a narrow beam.
+
+'''
